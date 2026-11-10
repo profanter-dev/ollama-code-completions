@@ -14,7 +14,7 @@ namespace OllamaCodeCompletions
     ///    (the suggestion session, command filter) by the time the user starts typing.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("Ollama Code Completions", "Inline ghost-text autocomplete via Ollama.", "1.2.1")]
+    [InstalledProductRegistration("Ollama Code Completions", "Inline ghost-text autocomplete via Ollama or llama-server.", "1.3.0")]
     [Guid(PackageGuidString)]
     [ProvideOptionPage(typeof(OptionsPage), "Ollama Code Completions", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.NoSolution_string, PackageAutoLoadFlags.BackgroundLoad)]

@@ -27,7 +27,7 @@ def quicksort(arr):
 
 - **FIM autocomplete** — uses Ollama's native `suffix` parameter, so any FIM-capable code model works out of the box (qwen2.5-coder, codellama, codegemma, deepseek-coder, starcoder2, …).
 - **Ollama or llama-server** — talks to Ollama (`/api/generate`) or llama.cpp's `llama-server` (`/infill`); pick the backend in the options.
-- **Debounced** — ~300 ms by default; in-flight requests are cancelled the moment you keep typing.
+- **Debounced** — ~1000 ms by default; in-flight requests are cancelled the moment you keep typing.
 - **Instant cache replay** — backspacing over a recent suggestion or typing the first character of one re-shows it immediately from an in-memory LRU cache, with no network call and no debounce delay.
 - **File-path prompt header** — the file's solution-relative path is prepended as a comment (`// File: src/Services/UserService.cs`) so the model knows the language and can pick up project conventions from directory names.
 - **Output post-processing** — raw FIM output is cleaned before display: leading newlines on fresh lines are stripped, mid-line completions are truncated to one line, suffix overlap with existing buffer text is removed, unbalanced brackets are truncated, echoed prefix text is stripped, and a configurable line cap is applied.
@@ -87,7 +87,7 @@ Open **Tools → Options → Ollama Code Completions → General**.
 | Authentication | Password                      | _(empty)_                | Stored in Windows Credential Manager. Shown as `********` once set. |
 | Authentication | API key                       | _(empty)_                | llama-server only: sent as `Authorization: Bearer <key>` when Basic auth is off. Stored in Windows Credential Manager. |
 | Behavior       | Enabled                       | `true`                   | Global kill-switch.                                                 |
-| Behavior       | Debounce delay (ms)           | `300`                    | Idle time after the last keystroke before a request fires.          |
+| Behavior       | Debounce delay (ms)           | `1000`                   | Idle time after the last keystroke before a request fires.          |
 | Behavior       | Multi-line completions        | `Auto`                   | `Auto` chooses single-line for comments and string values, multi-line for block openers and blank lines, default single-line otherwise. `Always` never restricts. `Never` always single-line. |
 | Behavior       | Max completion lines          | `6`                      | Hard ceiling on lines per suggestion, applied after all other filters. Only meaningful when multi-line is allowed. |
 | Behavior       | Max prefix characters         | `4096`                   | Context before the cursor.                                          |
@@ -167,7 +167,7 @@ The preset listens on port 8012. Without a preset, the server listens on whateve
 ## Usage
 
 1. Start typing in any editor window for a supported content type (most code files qualify).
-2. Pause for ~300 ms.
+2. Pause for about a second (the debounce delay).
 3. Ghost text appears inline.
 4. **Tab** to insert it, **Esc** (or just keep typing) to dismiss.
 
