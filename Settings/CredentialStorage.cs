@@ -14,6 +14,7 @@ namespace OllamaCodeCompletions
     internal static class CredentialStorage
     {
         private const string TargetName = "OllamaCopilot:Auth";
+        private const string ApiKeyTargetName = "OllamaCopilot:ApiKey";
         private const int ERROR_NOT_FOUND = 1168;
 
         // ---- Public API ----
@@ -30,9 +31,37 @@ namespace OllamaCodeCompletions
             return pass;
         }
 
-        public static (string Username, string Password) Read()
+        public static (string Username, string Password) Read() => Read(TargetName);
+
+        public static void Save(string username, string password) =>
+            Save(TargetName, username, password, "Ollama Code Completions HTTP Basic auth");
+
+        public static void Delete()
         {
-            if (!CredRead(TargetName, CRED_TYPE.GENERIC, 0, out IntPtr credPtr))
+            CredDelete(TargetName, CRED_TYPE.GENERIC, 0);
+        }
+
+        /// <summary>The llama-server API key (sent as a Bearer token), or null if none is stored.</summary>
+        public static string GetApiKey()
+        {
+            var (_, key) = Read(ApiKeyTargetName);
+            return key;
+        }
+
+        /// <summary>Stores the API key; an empty key removes the entry.</summary>
+        public static void SaveApiKey(string apiKey)
+        {
+            if (string.IsNullOrEmpty(apiKey))
+                CredDelete(ApiKeyTargetName, CRED_TYPE.GENERIC, 0);
+            else
+                Save(ApiKeyTargetName, string.Empty, apiKey, "Ollama Code Completions llama-server API key");
+        }
+
+        // ---- Credential Manager access ----
+
+        private static (string Username, string Password) Read(string targetName)
+        {
+            if (!CredRead(targetName, CRED_TYPE.GENERIC, 0, out IntPtr credPtr))
             {
                 int err = Marshal.GetLastWin32Error();
                 if (err == ERROR_NOT_FOUND)
@@ -59,7 +88,7 @@ namespace OllamaCodeCompletions
             }
         }
 
-        public static void Save(string username, string password)
+        private static void Save(string targetName, string username, string password, string comment)
         {
             byte[] passBytes = Encoding.Unicode.GetBytes(password ?? string.Empty);
             IntPtr blobPtr = passBytes.Length > 0 ? Marshal.AllocHGlobal(passBytes.Length) : IntPtr.Zero;
@@ -71,14 +100,14 @@ namespace OllamaCodeCompletions
                 var cred = new CREDENTIAL
                 {
                     Type = CRED_TYPE.GENERIC,
-                    TargetName = TargetName,
+                    TargetName = targetName,
                     UserName = username ?? string.Empty,
                     CredentialBlob = blobPtr,
                     CredentialBlobSize = (uint)passBytes.Length,
                     Persist = CRED_PERSIST.LOCAL_MACHINE, // per-user, persists across reboots, no admin required
                     AttributeCount = 0,
                     Attributes = IntPtr.Zero,
-                    Comment = "Ollama Code Completions HTTP Basic auth",
+                    Comment = comment,
                     TargetAlias = null,
                 };
 
@@ -89,11 +118,6 @@ namespace OllamaCodeCompletions
             {
                 if (blobPtr != IntPtr.Zero) Marshal.FreeHGlobal(blobPtr);
             }
-        }
-
-        public static void Delete()
-        {
-            CredDelete(TargetName, CRED_TYPE.GENERIC, 0);
         }
 
         // ---- P/Invoke ----

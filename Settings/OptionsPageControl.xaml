@@ -14,6 +14,12 @@
                 <x:Type TypeName="local:MultilineMode"/>
             </ObjectDataProvider.MethodParameters>
         </ObjectDataProvider>
+        <ObjectDataProvider x:Key="ServerBackendValues" MethodName="GetValues"
+                            ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="local:ServerBackend"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="8">
@@ -25,18 +31,24 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="120"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Label Grid.Row="0" Grid.Column="0" Content="Server URL:" VerticalAlignment="Center"/>
-                    <TextBox x:Name="ServerUrlTextBox" Grid.Row="0" Grid.Column="1" Margin="0,4"
+                    <Label Grid.Row="0" Grid.Column="0" Content="Server backend:" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="BackendComboBox" Grid.Row="0" Grid.Column="1" Margin="0,4" Width="120" HorizontalAlignment="Left"
+                              ItemsSource="{Binding Source={StaticResource ServerBackendValues}}"
+                              SelectedItem="{Binding Backend, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <Label Grid.Row="1" Grid.Column="0" Content="Server URL:" VerticalAlignment="Center"/>
+                    <TextBox x:Name="ServerUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="0,4"
                              Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <Label Grid.Row="1" Grid.Column="0" Content="Model:" VerticalAlignment="Center"/>
-                    <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,4" LastChildFill="True">
+                    <Label Grid.Row="2" Grid.Column="0" Content="Model:" VerticalAlignment="Center"/>
+                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,4" LastChildFill="True">
                         <Button x:Name="TestButton" DockPanel.Dock="Right" Content="Test connection"
                                 Padding="8,2" Margin="4,0,0,0" Click="OnTestConnectionClicked"/>
                         <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh"
@@ -45,7 +57,7 @@
                                   Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"/>
                     </DockPanel>
 
-                    <TextBlock x:Name="StatusText" Grid.Row="2" Grid.Column="1" Margin="0,2,0,0"
+                    <TextBlock x:Name="StatusText" Grid.Row="3" Grid.Column="1" Margin="0,2,0,0"
                                TextWrapping="Wrap" Foreground="Gray" FontStyle="Italic"
                                MinHeight="18"/>
                 </Grid>
@@ -55,6 +67,7 @@
             <GroupBox Header="Authentication" Margin="0,0,0,8" Padding="8">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -76,6 +89,10 @@
                     <Label Grid.Row="2" Grid.Column="0" Content="Password:" VerticalAlignment="Center"/>
                     <PasswordBox x:Name="PasswordBox" Grid.Row="2" Grid.Column="1" Margin="0,4"
                                  IsEnabled="{Binding ElementName=UseAuthCheckBox, Path=IsChecked}"/>
+
+                    <Label Grid.Row="3" Grid.Column="0" Content="API key:" VerticalAlignment="Center"/>
+                    <PasswordBox x:Name="ApiKeyBox" Grid.Row="3" Grid.Column="1" Margin="0,4"
+                                 ToolTip="Bearer token for llama-server --api-key. Ignored by Ollama and when HTTP Basic auth is enabled."/>
                 </Grid>
             </GroupBox>
 

@@ -11,8 +11,8 @@ namespace OllamaCodeCompletions
     /// Code-behind for the WPF Options page UI. The hosting <see cref="OptionsPage"/>
     /// sets <c>DataContext = this-page</c> on activation; XAML bindings cover all
     /// simple properties. Two things bindings can't cleanly do are handled here:
-    /// the unbound <see cref="PasswordBox"/> (loaded on activation, saved on apply)
-    /// and the runtime-only model list populated by the Refresh button.
+    /// the unbound <see cref="PasswordBox"/> and API key box (loaded on activation,
+    /// saved on apply) and the runtime-only model list populated by the Refresh button.
     /// </summary>
     public partial class OptionsPageControl : UserControl
     {
@@ -31,6 +31,7 @@ namespace OllamaCodeCompletions
             if (DataContext is OptionsPage page)
             {
                 PasswordBox.Password = CredentialStorage.GetPassword() ?? string.Empty;
+                ApiKeyBox.Password = CredentialStorage.GetApiKey() ?? string.Empty;
 
                 // Re-bind ItemsSource each activation — the list is mutated by the
                 // Refresh handler and might have changed while the dialog was closed.
@@ -40,7 +41,7 @@ namespace OllamaCodeCompletions
 
         /// <summary>
         /// Pushes fields back into <see cref="CredentialStorage"/> that bindings
-        /// don't handle (the unbound <see cref="PasswordBox"/>).
+        /// don't handle (the unbound <see cref="PasswordBox"/> and API key box).
         /// Called by <see cref="OptionsPage.OnApply"/>.
         /// </summary>
         internal void SaveToPage()
@@ -50,6 +51,7 @@ namespace OllamaCodeCompletions
                 string username = page.Username ?? string.Empty;
                 string password = PasswordBox.Password ?? string.Empty;
                 CredentialStorage.Save(username, password);
+                CredentialStorage.SaveApiKey(ApiKeyBox.Password ?? string.Empty);
             }
         }
 
@@ -65,13 +67,16 @@ namespace OllamaCodeCompletions
             bool useAuth = UseAuthCheckBox.IsChecked == true;
             string username = UsernameTextBox.Text;
             string password = PasswordBox.Password;
+            string apiKey = ApiKeyBox.Password;
 
             RefreshButton.IsEnabled = false;
             StatusText.Text = "Refreshing…";
             try
             {
-                var models = await OllamaClient.ListModelsAsync(
-                    serverUrl, useAuth, username, password, CancellationToken.None);
+                // The backend ComboBox binds with UpdateSourceTrigger=PropertyChanged,
+                // so page.Backend already reflects the live selection.
+                var models = await CompletionClient.Create(page.Backend).ListModelsAsync(
+                    serverUrl, useAuth, username, password, apiKey, CancellationToken.None);
 
                 page.AvailableModels = models;
                 ModelComboBox.ItemsSource = models;
@@ -99,14 +104,15 @@ namespace OllamaCodeCompletions
             bool useAuth = UseAuthCheckBox.IsChecked == true;
             string username = UsernameTextBox.Text;
             string password = PasswordBox.Password;
+            string apiKey = ApiKeyBox.Password;
 
             TestButton.IsEnabled = false;
             StatusText.Text = "Testing…";
             var sw = Stopwatch.StartNew();
             try
             {
-                var result = await OllamaClient.TestConnectionAsync(
-                    serverUrl, model, useAuth, username, password, CancellationToken.None);
+                var result = await CompletionClient.Create(page.Backend).TestConnectionAsync(
+                    serverUrl, model, useAuth, username, password, apiKey, CancellationToken.None);
                 sw.Stop();
 
                 StatusText.Text = result.Success

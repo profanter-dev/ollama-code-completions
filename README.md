@@ -6,9 +6,9 @@
 
 ---
 
-Inline ghost-text autocomplete for **Visual Studio 2022 and Visual Studio 2026**, powered by your own self-hosted [Ollama](https://ollama.com/) instance.
+Inline ghost-text autocomplete for **Visual Studio 2022 and Visual Studio 2026**, powered by your own self-hosted [Ollama](https://ollama.com/) instance or llama.cpp [`llama-server`](https://github.com/ggml-org/llama.cpp/tree/master/tools/server).
 
-It debounces your typing, sends the code before _and_ after the cursor to Ollama using **fill-in-the-middle (FIM)** prompting, and renders the result as inline ghost text. **Tab** to accept, **Esc** to dismiss. Credentials for your Ollama server (HTTP Basic auth) are stored in the **Windows Credential Manager**, never in plaintext settings.
+It debounces your typing, sends the code before _and_ after the cursor to the server using **fill-in-the-middle (FIM)** prompting, and renders the result as inline ghost text. **Tab** to accept, **Esc** to dismiss. Credentials for your server (HTTP Basic auth or a llama-server API key) are stored in the **Windows Credential Manager**, never in plaintext settings.
 
 ```
 def quicksort(arr):
@@ -26,6 +26,7 @@ def quicksort(arr):
 ## Features
 
 - **FIM autocomplete** — uses Ollama's native `suffix` parameter, so any FIM-capable code model works out of the box (qwen2.5-coder, codellama, codegemma, deepseek-coder, starcoder2, …).
+- **Ollama or llama-server** — talks to Ollama (`/api/generate`) or llama.cpp's `llama-server` (`/infill`); pick the backend in the options.
 - **Debounced** — ~300 ms by default; in-flight requests are cancelled the moment you keep typing.
 - **Instant cache replay** — backspacing over a recent suggestion or typing the first character of one re-shows it immediately from an in-memory LRU cache, with no network call and no debounce delay.
 - **File-path prompt header** — the file's solution-relative path is prepended as a comment (`// File: src/Services/UserService.cs`) so the model knows the language and can pick up project conventions from directory names.
@@ -34,7 +35,8 @@ def quicksort(arr):
 - **Inline ghost text** — multi-line suggestions render in a faded color directly in the editor, aligned with your code's font.
 - **Tab to accept, Esc to dismiss** — only intercepted when a suggestion is actually showing.
 - **HTTP Basic auth** — for self-hosted instances behind a reverse proxy (nginx, Caddy, Traefik, Cloudflare Access).
-- **Secure credential storage** — username/password stored in the Windows Credential Manager under target `OllamaCopilot:Auth`.
+- **llama-server API key** — sent as `Authorization: Bearer <key>` for servers started with `--api-key`.
+- **Secure credential storage** — username/password stored in the Windows Credential Manager under target `OllamaCopilot:Auth`, the API key under `OllamaCopilot:ApiKey`.
 - **Status bar feedback** — shows `Ollama Code Completions: thinking…` while a request is in flight.
 - **Crash-safe** — connection failures, timeouts, and bad config never throw out of the extension.
 
@@ -77,18 +79,20 @@ Open **Tools → Options → Ollama Code Completions → General**.
 
 | Category       | Setting                       | Default                  | Notes                                                               |
 | -------------- | ----------------------------- | ------------------------ | ------------------------------------------------------------------- |
-| Connection     | Server URL                    | `http://localhost:11434` | Base URL only — no trailing `/api/generate`.                        |
-| Connection     | Model                         | `qwen2.5-coder:1.5b`     | Any FIM-capable Ollama model tag.                                   |
+| Connection     | Server backend                | `Ollama`                 | `Ollama` or `LlamaServer` (llama.cpp `llama-server`).               |
+| Connection     | Server URL                    | `http://localhost:11434` | Base URL only — no trailing `/api/generate` or `/infill`.           |
+| Connection     | Model                         | `qwen2.5-coder:1.5b`     | Any FIM-capable Ollama model tag. Optional for a single-model llama-server, which ignores it. |
 | Authentication | Use HTTP Basic authentication | `false`                  | When on, sends `Authorization: Basic <base64>` on every request.    |
 | Authentication | Username                      | _(empty)_                | Stored in Windows Credential Manager.                               |
 | Authentication | Password                      | _(empty)_                | Stored in Windows Credential Manager. Shown as `********` once set. |
+| Authentication | API key                       | _(empty)_                | llama-server only: sent as `Authorization: Bearer <key>` when Basic auth is off. Stored in Windows Credential Manager. |
 | Behavior       | Enabled                       | `true`                   | Global kill-switch.                                                 |
 | Behavior       | Debounce delay (ms)           | `300`                    | Idle time after the last keystroke before a request fires.          |
 | Behavior       | Multi-line completions        | `Auto`                   | `Auto` chooses single-line for comments and string values, multi-line for block openers and blank lines, default single-line otherwise. `Always` never restricts. `Never` always single-line. |
 | Behavior       | Max completion lines          | `6`                      | Hard ceiling on lines per suggestion, applied after all other filters. Only meaningful when multi-line is allowed. |
 | Behavior       | Max prefix characters         | `4096`                   | Context before the cursor.                                          |
 | Behavior       | Max suffix characters         | `1024`                   | Context after the cursor.                                           |
-| Behavior       | Max tokens to predict         | `128`                    | Hard ceiling per suggestion (`num_predict`).                        |
+| Behavior       | Max tokens to predict         | `128`                    | Hard ceiling per suggestion (`num_predict` / `n_predict`).          |
 | Behavior       | Request timeout (seconds)     | `30`                     | Per-request HTTP timeout.                                           |
 
 ### Recommended models
@@ -139,6 +143,27 @@ Then in Tools → Options:
 
 ---
 
+## Using llama-server
+
+The extension can talk to llama.cpp's `llama-server` instead of Ollama. It uses the server's `/infill` endpoint, which applies the FIM tokens of the loaded model. For example, with the built-in Qwen 2.5 Coder preset:
+
+```
+llama-server --fim-qwen-1.5b-default --api-key <your-key>
+```
+
+The preset listens on port 8012. Without a preset, the server listens on whatever `--port` you start it with. Then in Tools → Options:
+
+- **Server backend**: `LlamaServer`
+- **Server URL**: `http://localhost:8012` (match the server's port)
+- **Model**: anything — a single-model server ignores it. In router mode (several models), pick one with **Refresh**.
+- **API key**: the `--api-key` value, if you set one. llama-server expects it as a Bearer token; it does not accept HTTP Basic auth. Use **Use HTTP Basic authentication** only when a reverse proxy in front of the server checks the credentials.
+
+**Test connection** checks the model list (`/v1/models`) and then sends a one-token `/infill` request, so a wrong API key or a model without FIM support is reported right away.
+
+> The loaded model must have FIM tokens (a code model such as qwen2.5-coder, codellama or deepseek-coder). Chat-only models are rejected by `/infill` with HTTP 501.
+
+---
+
 ## Usage
 
 1. Start typing in any editor window for a supported content type (most code files qualify).
@@ -150,7 +175,7 @@ The extension is a no-op if:
 
 - **Enabled** is off in settings, or
 - the cursor is in an empty file with no surrounding context, or
-- Ollama is unreachable (you'll see `Ollama Code Completions: <error>` in the status bar; the IDE keeps working normally).
+- the server is unreachable (you'll see `Ollama Code Completions: <error>` in the status bar; the IDE keeps working normally).
 
 ---
 
@@ -171,6 +196,7 @@ prepend "// File: <solution-relative-path>\n" header
 cache hit (second check)? ──yes──→ render
    ↓ miss
 POST {url}/api/generate              ← Ollama, `suffix` for native FIM
+  or {url}/infill                    ← llama-server, `input_prefix` / `input_suffix`
    ↓
 CompletionPostProcessor.Clean()      ← strip noise from raw FIM output
 store cleaned completion in LRU cache
@@ -202,7 +228,9 @@ OllamaCopilot/
 │   └── CompletionCache.cs             Per-view bounded LRU cache (prefix, suffix) → completion
 │
 ├── Ollama/
-│   └── OllamaClient.cs                /api/generate + FIM + Basic auth
+│   ├── CompletionClient.cs            Abstract base: HTTP, timeouts, auth, test connection
+│   ├── OllamaClient.cs                Ollama: /api/generate + /api/tags
+│   └── LlamaServerClient.cs           llama-server: /infill + /v1/models, Bearer API key
 │
 ├── Settings/
 │   ├── OptionsPage.cs                 UIElementDialogPage (persisted properties)
@@ -229,9 +257,11 @@ OllamaCopilot/
 
 **No suggestions appear.** Verify Ollama is reachable: `curl http://your-server/api/tags`. Then confirm the model is FIM-capable and pulled. Check the status bar for an error.
 
+**No suggestions with llama-server.** Check the server answers: `curl -H "Authorization: Bearer <key>" http://your-server/v1/models`. Use **Test connection** — `HTTP 501` / "does not support fill-in-the-middle" means the loaded model has no FIM tokens. With **Log to file** on, failed requests log the server's error message.
+
 **Suggestions appear but always look like prose / explanations.** You're using an instruct-tuned model. Switch to the base or `:code` variant — for example `qwen2.5-coder:7b-base` or `codellama:7b-code`.
 
-**Auth always fails.** Open _Credential Manager_ (Windows) → _Windows Credentials_ and look for `OllamaCopilot:Auth`. You can delete it there to reset. Re-enter the password in Tools → Options.
+**Auth always fails.** Open _Credential Manager_ (Windows) → _Windows Credentials_ and look for `OllamaCopilot:Auth`. You can delete it there to reset. Re-enter the password in Tools → Options. The llama-server API key lives under `OllamaCopilot:ApiKey`.
 
 **Tab never inserts the suggestion.** Another extension may be eating Tab earlier in the command chain. Try briefly disabling other AI / IntelliSense extensions to isolate.
 

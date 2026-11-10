@@ -23,6 +23,9 @@ namespace OllamaCodeCompletions
     /// </summary>
     public enum MultilineMode { Auto, Always, Never }
 
+    /// <summary>Which server API the completion requests are sent to.</summary>
+    public enum ServerBackend { Ollama, LlamaServer }
+
     [Guid("a7e2f8b3-9c14-4f2d-8e6b-1f5d3c9a8e72")]
     [ComVisible(true)]
     public class OptionsPage : UIElementDialogPage
@@ -35,20 +38,25 @@ namespace OllamaCodeCompletions
         // --- Connection ---
 
         [Category(CategoryConnection)]
+        [DisplayName("Server backend")]
+        [Description("Ollama: /api/generate with suffix + /api/tags. LlamaServer: llama.cpp llama-server /infill + /v1/models.")]
+        public ServerBackend Backend { get; set; } = ServerBackend.Ollama;
+
+        [Category(CategoryConnection)]
         [DisplayName("Server URL")]
-        [Description("Base URL of the Ollama server, e.g. https://ollama.yourdomain.com (no trailing /api/generate).")]
+        [Description("Base URL of the server, e.g. https://ollama.yourdomain.com or http://127.0.0.1:8012 (no trailing /api/generate or /infill).")]
         public string ServerUrl { get; set; } = "http://localhost:11434";
 
         [Category(CategoryConnection)]
         [DisplayName("Model")]
-        [Description("Model name to use for FIM completion, e.g. qwen2.5-coder:1.5b.")]
+        [Description("Model name to use for FIM completion, e.g. qwen2.5-coder:1.5b. Optional for llama-server: a single-model server ignores it.")]
         public string Model { get; set; } = "qwen2.5-coder:1.5b";
 
         // --- Authentication ---
 
         [Category(CategoryAuthentication)]
         [DisplayName("Use HTTP Basic authentication")]
-        [Description("If enabled, sends an Authorization: Basic <base64> header on every Ollama API request.")]
+        [Description("If enabled, sends an Authorization: Basic <base64> header on every server API request.")]
         public bool UseAuthentication { get; set; } = false;
 
         [Category(CategoryAuthentication)]
@@ -76,6 +84,21 @@ namespace OllamaCodeCompletions
             }
         }
 
+        [Category(CategoryAuthentication)]
+        [DisplayName("API key")]
+        [Description("Bearer token for llama-server --api-key. Ignored by Ollama and when HTTP Basic auth is enabled. Stored securely in the Windows Credential Manager (target: OllamaCopilot:ApiKey).")]
+        [PasswordPropertyText(true)]
+        public string ApiKey
+        {
+            // Same sentinel scheme as Password: the real key never leaves the credential store.
+            get => string.IsNullOrEmpty(CredentialStorage.GetApiKey()) ? string.Empty : PasswordSentinel;
+            set
+            {
+                if (value == PasswordSentinel) return;       // unchanged in the dialog
+                CredentialStorage.SaveApiKey(value ?? string.Empty);
+            }
+        }
+
         // --- Behavior ---
 
         [Category(CategoryBehavior)]
@@ -100,12 +123,12 @@ namespace OllamaCodeCompletions
 
         [Category(CategoryBehavior)]
         [DisplayName("Max tokens to predict")]
-        [Description("Upper bound on tokens to generate per suggestion (Ollama num_predict).")]
+        [Description("Upper bound on tokens to generate per suggestion (Ollama num_predict / llama-server n_predict).")]
         public int MaxPredict { get; set; } = 128;
 
         [Category(CategoryBehavior)]
         [DisplayName("Request timeout (seconds)")]
-        [Description("HTTP timeout for each Ollama request.")]
+        [Description("HTTP timeout for each completion request.")]
         public int TimeoutSeconds { get; set; } = 30;
 
         [Category(CategoryBehavior)]
